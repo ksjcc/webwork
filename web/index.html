@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>沉星港寻宝记 · async/await 动画演示</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="sky"></div>
+
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo-map">🗺️</div>
+        <div class="brand-text">
+          <h1>沉星港寻宝记</h1>
+          <p>用 async / await 驱动的一段寻宝动画</p>
+        </div>
+      </div>
+
+      <div class="hud">
+        <div class="hud-item">
+          <span class="hud-k">体力</span>
+          <span class="hud-v" id="hudStamina">3</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-k">尝试</span>
+          <span class="hud-v" id="hudTries">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-k">计时</span>
+          <span class="hud-v" id="hudClock">0.0s</span>
+        </div>
+        <div class="hud-item speed-item">
+          <span class="hud-k">速度</span>
+          <select id="speed" aria-label="播放速度">
+            <option value="1">1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <main class="stage">
+      <!-- ================= 海图 ================= -->
+      <section class="map-card" id="mapCard">
+        <svg id="map" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet" aria-label="寻宝海图">
+          <defs>
+            <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#0b2038" />
+              <stop offset="0.55" stop-color="#0e2c48" />
+              <stop offset="1" stop-color="#06121d" />
+            </linearGradient>
+            <radialGradient id="islandGrad" cx="45%" cy="30%" r="75%">
+              <stop offset="0" stop-color="#375744" />
+              <stop offset="1" stop-color="#132019" />
+            </radialGradient>
+            <linearGradient id="routeGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#c99a45" />
+              <stop offset="0.5" stop-color="#ffe6ab" />
+              <stop offset="1" stop-color="#f3c46b" />
+            </linearGradient>
+            <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffe9a8" />
+              <stop offset="1" stop-color="#c8892b" />
+            </linearGradient>
+            <linearGradient id="chestBody" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7a4a1c" />
+              <stop offset="1" stop-color="#42260d" />
+            </linearGradient>
+            <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="5" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="soft" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="14" />
+            </filter>
+          </defs>
+
+          <rect width="1000" height="600" fill="url(#sea)" />
+          <g class="grid" stroke="#7fb6d9" stroke-opacity="0.07" stroke-width="1">
+            <path d="M0 150 H1000 M0 300 H1000 M0 450 H1000" />
+            <path d="M200 0 V600 M400 0 V600 M600 0 V600 M800 0 V600" />
+          </g>
+
+          <!-- 岛屿 -->
+          <g class="islands">
+            <path d="M18 478 Q56 424 128 434 Q196 444 208 502 Q214 560 148 574 Q66 586 34 544 Z" />
+            <path d="M196 292 Q258 262 330 286 Q392 308 374 352 Q352 398 278 392 Q212 386 202 342 Z" />
+            <path d="M478 162 Q540 132 612 152 Q682 174 668 224 Q650 274 576 270 Q502 264 484 214 Z" />
+            <path d="M782 246 Q848 214 914 242 Q966 266 950 318 Q932 370 860 360 Q794 352 786 300 Z" />
+            <path d="M372 470 Q420 452 462 470 Q500 488 486 518 Q466 550 404 542 Q356 534 356 502 Z" />
+          </g>
+
+          <!-- 航线 -->
+          <path id="routeGhost"
+            d="M 62 520 C 132 474 148 420 214 392 C 276 366 320 352 380 340 C 450 326 470 268 520 248 C 580 222 620 240 660 268 C 700 296 726 322 784 318 C 836 314 862 302 906 298"
+            fill="none" stroke="#ffd98a" stroke-opacity="0.18" stroke-width="3" stroke-dasharray="9 13"
+            stroke-linecap="round" />
+          <path id="route"
+            d="M 62 520 C 132 474 148 420 214 392 C 276 366 320 352 380 340 C 450 326 470 268 520 248 C 580 222 620 240 660 268 C 700 296 726 322 784 318 C 836 314 862 302 906 298"
+            fill="none" stroke="url(#routeGrad)" stroke-width="5" stroke-linecap="round" filter="url(#glow)" />
+
+          <!-- 迷雾 -->
+          <g id="fogLayer" class="fog-layer">
+            <ellipse cx="300" cy="330" rx="140" ry="62" />
+            <ellipse cx="232" cy="360" rx="110" ry="48" />
+            <ellipse cx="356" cy="356" rx="96" ry="40" />
+          </g>
+
+          <g id="nodes" class="nodes"></g>
+
+          <!-- 罗盘装饰 -->
+          <g class="compass" transform="translate(112 132)">
+            <circle r="44" fill="none" stroke="rgba(240,198,116,0.32)" stroke-width="1.2" />
+            <circle r="28" fill="none" stroke="rgba(240,198,116,0.16)" stroke-width="1" />
+            <path d="M0 -38 L6 -6 L38 0 L6 6 L0 38 L-6 6 L-38 0 L-6 -6 Z"
+              fill="rgba(240,198,116,0.2)" stroke="rgba(240,198,116,0.45)" stroke-width="1" />
+            <text class="map-name" x="60" y="-4">沉星港</text>
+            <text class="map-sub" x="61" y="15">THE STARFALL HARBOR</text>
+          </g>
+
+          <!-- 宝箱 -->
+          <g id="chestGroup" class="chest" transform="translate(906 298)">
+            <ellipse class="chest-halo" cx="0" cy="4" rx="62" ry="42" />
+            <g class="chest-art" transform="translate(-26 -30)">
+              <rect x="0" y="16" width="52" height="30" rx="5" fill="url(#chestBody)" stroke="#f0c674"
+                stroke-width="2" />
+              <rect x="2" y="28" width="48" height="4" fill="#f0c674" opacity="0.7" />
+              <g class="chest-lid">
+                <path d="M0 16 Q0 0 26 0 Q52 0 52 16 Z" fill="#8a5520" stroke="#f0c674" stroke-width="2" />
+              </g>
+              <circle cx="26" cy="34" r="4.5" fill="url(#goldGrad)" stroke="#7a4a1c" stroke-width="1" />
+            </g>
+          </g>
+
+          <!-- 主角 -->
+          <g id="hero" class="hero">
+            <circle class="hero-halo" r="20" />
+            <circle class="hero-dot" r="13" />
+            <text class="hero-icon" y="7" text-anchor="middle">🧭</text>
+          </g>
+
+          <g id="sparks"></g>
+        </svg>
+
+        <div class="map-badges">
+          <span class="badge" id="badgeFog">🌫️ 迷雾未散</span>
+          <span class="badge" id="badgeTorch">🔥 火把未点燃</span>
+          <span class="badge" id="badgeStar">✨ 星图未对齐</span>
+        </div>
+
+        <div class="map-caption" id="caption">点击「开始寻宝」，跟老船长的遗书一起出发</div>
+
+        <div class="progress">
+          <div class="progress-bar"><i id="progressFill"></i></div>
+          <span id="progressText">0%</span>
+        </div>
+      </section>
+
+      <!-- ================= 侧栏 ================= -->
+      <aside class="side">
+        <div class="steps" id="steps"></div>
+
+        <div class="torches" id="torches">
+          <div class="torch" data-hand="左手火把"><span class="flame">🔥</span><span class="torch-name">左手火把</span><span
+              class="torch-time">0.8s</span></div>
+          <div class="torch" data-hand="右手火把"><span class="flame">🔥</span><span class="torch-name">右手火把</span><span
+              class="torch-time">1.2s</span></div>
+        </div>
+
+        <div class="log-panel">
+          <div class="log-head"><span>航行日志</span><span class="log-dot"></span></div>
+          <div class="log" id="log"></div>
+        </div>
+
+        <button id="startBtn" class="start-btn"><span>开始寻宝</span></button>
+        <p class="hint">提示：守卫有 50% 概率出现，体力耗尽则寻宝失败</p>
+      </aside>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
